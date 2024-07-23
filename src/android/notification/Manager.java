@@ -123,6 +123,7 @@ public final class Manager {
      */
     @SuppressLint("WrongConstant")
     private void createDefaultChannel() {
+        Log.d("local-notification", "createDefaultChannel");
         NotificationManager mgr = getNotMgr();
 
         if (SDK_INT < O)
