@@ -32,7 +32,6 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.service.notification.StatusBarNotification;
 import androidx.core.app.NotificationManagerCompat;
-import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -123,7 +122,6 @@ public final class Manager {
      */
     @SuppressLint("WrongConstant")
     private void createDefaultChannel() {
-        Log.d("local-notification", "createDefaultChannel");
         NotificationManager mgr = getNotMgr();
 
         if (SDK_INT < O)
