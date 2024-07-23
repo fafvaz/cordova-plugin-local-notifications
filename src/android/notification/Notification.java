@@ -29,10 +29,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.service.notification.StatusBarNotification;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.util.ArraySet;
-import android.support.v4.util.Pair;
+import androidx.core.app.NotificationCompat;
+import androidx.collection.ArraySet;
+import androidx.core.util.Pair;
+
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -50,9 +50,9 @@ import static android.app.AlarmManager.RTC_WAKEUP;
 import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.os.Build.VERSION.SDK_INT;
 import static android.os.Build.VERSION_CODES.M;
-import static android.support.v4.app.NotificationCompat.PRIORITY_HIGH;
-import static android.support.v4.app.NotificationCompat.PRIORITY_MAX;
-import static android.support.v4.app.NotificationCompat.PRIORITY_MIN;
+import static androidx.core.app.NotificationCompat.PRIORITY_HIGH;
+import static androidx.core.app.NotificationCompat.PRIORITY_MAX;
+import static androidx.core.app.NotificationCompat.PRIORITY_MIN;
 
 /**
  * Wrapper class around OS notification class. Handles basic operations
@@ -88,6 +88,16 @@ public final class Notification {
 
     // Builder with full configuration
     private final NotificationCompat.Builder builder;
+
+    public String getApplicationState() {
+        return applicationState;
+    }
+
+    public void setApplicationState(String applicationState) {
+        this.applicationState = applicationState;
+    }
+
+    private String applicationState;
 
     /**
      * Constructor
@@ -150,20 +160,32 @@ public final class Notification {
     }
 
     /**
-     * Notification type can be one of triggered or scheduled.
+     * Previous implementation of getType method. A notification is of type triggered if it was already triggered and is not a repeating notification
      */
     public Type getType() {
-        Manager mgr                    = Manager.getInstance(context);
-        StatusBarNotification[] toasts = mgr.getActiveNotifications();
-        int id                         = getId();
+        return isScheduled() ? Type.SCHEDULED : Type.TRIGGERED;
+    }
 
-        for (StatusBarNotification toast : toasts) {
-            if (toast.getId() == id) {
-                return Type.TRIGGERED;
-            }
-        }
+    /**
+     * If the notification is scheduled.
+     */
+    public boolean isScheduled() {
+        return isRepeating() || !wasInThePast();
+    }
 
-        return Type.SCHEDULED;
+    /**
+     * If the notification was in the past.
+     */
+    public boolean wasInThePast() {
+        return new Date().after(getTriggerDate());
+    }
+
+    /**
+     * Trigger date.
+     */
+    public Date getTriggerDate() {
+        Long dateTime = options.getTrigger().optLong("at", 0);
+        return new Date(dateTime);
     }
 
     /**
@@ -217,29 +239,67 @@ public final class Notification {
             if (!date.after(new Date()) && trigger(intent, receiver))
                 continue;
 
-            PendingIntent pi = PendingIntent.getBroadcast(
-                    context, 0, intent, FLAG_CANCEL_CURRENT);
+            int flags;
+
+            if (SDK_INT >= 34) {
+                flags = FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+            } else if (SDK_INT >= 31) {
+                flags = FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE;
+            } else {
+                flags = FLAG_CANCEL_CURRENT;
+            }
+
+            PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, flags);
 
             try {
                 switch (options.getPrio()) {
                     case PRIORITY_MIN:
                         mgr.setExact(RTC, time, pi);
+                        scheduleNotification(false, RTC, time, pi);
                         break;
                     case PRIORITY_MAX:
                         if (SDK_INT >= M) {
-                            mgr.setExactAndAllowWhileIdle(RTC_WAKEUP, time, pi);
+                            scheduleNotification(true, RTC_WAKEUP, time, pi);
                         } else {
-                            mgr.setExact(RTC, time, pi);
+                            scheduleNotification(false, RTC, time, pi);
                         }
                         break;
                     default:
-                        mgr.setExact(RTC_WAKEUP, time, pi);
+                        scheduleNotification(false, RTC_WAKEUP, time, pi);
                         break;
                 }
-            } catch (Exception ignore) {
+            }
+            catch(SecurityException se) {
+                // thrown when trying to schedule an exact notification without permissions
+                // should never happen. Let's log just in case.
+                Log.e("notification", "Caught security exception when scheduling alarm.");
+            }
+            catch (Exception ignore) {
                 // Samsung devices have a known bug where a 500 alarms limit
                 // can crash the app
             }
+        }
+    }
+
+    private void scheduleNotification(boolean allowWhileIdle,
+                                      int type,
+                                      long triggerMillis,
+                                      PendingIntent operation) {
+
+        AlarmManager mgr = getAlarmMgr();
+        if(allowWhileIdle) {
+            if(options.getIsExactNotification()) {
+                mgr.setExactAndAllowWhileIdle(type, triggerMillis, operation);
+            }
+            else {
+                mgr.setAndAllowWhileIdle(type, triggerMillis, operation);
+            }
+        }
+        else if(options.getIsExactNotification()) {
+            mgr.setExact(type, triggerMillis, operation);
+        }
+        else {
+            mgr.set(type, triggerMillis, operation);
         }
     }
 
@@ -303,9 +363,17 @@ public final class Notification {
 
         for (String action : actions) {
             Intent intent = new Intent(action);
+            
+            int flags = 0;
+            
+            if (SDK_INT >= 34) {
+                flags = PendingIntent.FLAG_IMMUTABLE;
+            } else if (SDK_INT >= 31) {
+                flags = PendingIntent.FLAG_MUTABLE;
+            }
 
             PendingIntent pi = PendingIntent.getBroadcast(
-                    context, 0, intent, 0);
+                    context, 0, intent, flags);
 
             if (pi != null) {
                 getAlarmMgr().cancel(pi);
@@ -317,6 +385,9 @@ public final class Notification {
      * Present the local notification to user.
      */
     public void show() {
+        // Don't show notification if the application is in foreground
+        if(applicationState == null || applicationState.equalsIgnoreCase("foreground")) return;
+
         if (builder == null) return;
 
         if (options.showChronometer()) {
@@ -488,5 +559,4 @@ public final class Notification {
     private AlarmManager getAlarmMgr () {
         return (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
     }
-
 }

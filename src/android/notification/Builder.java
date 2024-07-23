@@ -27,17 +27,19 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationCompat.MessagingStyle.Message;
-import android.support.v4.media.app.NotificationCompat.MediaStyle;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationCompat.MessagingStyle.Message;
+import androidx.media.app.NotificationCompat.MediaStyle;
 import android.support.v4.media.session.MediaSessionCompat;
 
 import java.util.List;
 import java.util.Random;
 
+import de.appplant.cordova.plugin.localnotification.ClickActivity;
 import de.appplant.cordova.plugin.notification.action.Action;
 
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+import static android.os.Build.VERSION.SDK_INT;
 import static de.appplant.cordova.plugin.notification.Notification.EXTRA_UPDATE;
 
 /**
@@ -323,9 +325,17 @@ public final class Builder {
 
         int reqCode = random.nextInt();
 
-        PendingIntent deleteIntent = PendingIntent.getBroadcast(
-                context, reqCode, intent, FLAG_UPDATE_CURRENT);
+        int flags;
 
+        if (SDK_INT >= 34) {
+            flags = FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        } else if (SDK_INT >= 31) {
+            flags = FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE;
+        } else {
+            flags = FLAG_UPDATE_CURRENT;
+        }
+
+        PendingIntent deleteIntent = PendingIntent.getBroadcast(context, reqCode, intent, flags);
         builder.setDeleteIntent(deleteIntent);
     }
 
@@ -340,21 +350,32 @@ public final class Builder {
         if (clickActivity == null)
             return;
 
-        Intent intent = new Intent(context, clickActivity)
-                .putExtra(Notification.EXTRA_ID, options.getId())
-                .putExtra(Action.EXTRA_ID, Action.CLICK_ACTION_ID)
-                .putExtra(Options.EXTRA_LAUNCH, options.isLaunchingApp())
+        int reqCode = random.nextInt();
+
+        Bundle myBundle = new Bundle();
+        myBundle.putInt(Notification.EXTRA_ID, options.getId());
+        myBundle.putString(Action.EXTRA_ID, Action.CLICK_ACTION_ID);
+        myBundle.putBoolean(Options.EXTRA_LAUNCH, options.isLaunchingApp());
+
+        Intent myIntent = new Intent(context, ClickActivity.class)
+                .putExtras(myBundle)
                 .setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
 
         if (extras != null) {
-            intent.putExtras(extras);
+            myIntent.putExtras(extras);
         }
 
-        int reqCode = random.nextInt();
+        int flags;
 
-        PendingIntent contentIntent = PendingIntent.getService(
-                context, reqCode, intent, FLAG_UPDATE_CURRENT);
+        if (SDK_INT >= 34) {
+            flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        } else if (SDK_INT >= 31) {
+            flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE;
+        } else {
+            flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        }
 
+        PendingIntent contentIntent = PendingIntent.getActivity(context, reqCode, myIntent, flags);
         builder.setContentIntent(contentIntent);
     }
 
@@ -402,8 +423,17 @@ public final class Builder {
 
         int reqCode = random.nextInt();
 
-        return PendingIntent.getService(
-                context, reqCode, intent, FLAG_UPDATE_CURRENT);
+        int flags;
+
+        if (SDK_INT >= 34) {
+            flags = FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        } else if (SDK_INT >= 31) {
+            flags = FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE;
+        } else {
+            flags = FLAG_UPDATE_CURRENT;
+        }
+
+        return PendingIntent.getService(context, reqCode, intent, flags);
     }
 
     /**

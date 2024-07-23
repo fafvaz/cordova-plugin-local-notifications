@@ -3,6 +3,38 @@ ChangeLog
 
 Please also read the [Upgrade Guide](https://github.com/katzer/cordova-plugin-local-notifications/wiki/Upgrade-Guide) for more information.
 
+#### Unreleased
+
+#### Version 0.9.12 (27.09.2023)
+### 12-09-2023
+- Android: Make PendingIntents immutable for Android 14 [RMET-2666](https://outsystemsrd.atlassian.net/browse/RMET-2666)
+### 11-09-2023
+- Android: Replace dependency on Android Support Libraries with AndroidX [RMET-2823](https://outsystemsrd.atlassian.net/browse/RMET-2823)
+
+#### Version 0.9.11 (28.08.2023)
+### 04-08-2023
+- Added exact and inexact notifications [RMET-2665](https://outsystemsrd.atlassian.net/browse/RMET-2665)
+- Fixed Android 14 bug [RMET-2582](https://outsystemsrd.atlassian.net/browse/RMET-2582)
+
+#### Version 0.9.10 (19.12.2022)
+### 16-12-2022
+- Removed dependency to jcenter [RMET-2036](https://outsystemsrd.atlassian.net/browse/RMET-2036)
+
+#### Version 0.9.9 (21.09.2022)
+- Fix required for Android 13 regarding notification permissions (https://outsystemsrd.atlassian.net/browse/RMET-1833)
+
+#### Version 0.9.8 (04.11.2021)
+- New plugin release to include metadata tag in Extensibility Configurations in the OS wrapper
+
+#### Version 0.9.7 (30.09.2021)
+- Fix required for Android 12 - Use Activity instead of Service to handle notification clicks (https://outsystemsrd.atlassian.net/browse/RMET-1007)
+
+#### Version 0.9.6 (14.09.2021)
+- Changes required for Android 12 - Include SCHEDULE_EXACT_ALARM permission and specify mutability on PendingIntents (https://outsystemsrd.atlassian.net/browse/RMET-822)
+- Changes required for Andorid 12 - Change dependecy to cordova-plugin-badge so that MABS 8 build works (because of a gradle file) (https://outsystemsrd.atlassian.net/browse/RMET-822)
+- Changes required for Andorid 12 - Do not use notification trampolines for Android >= 12 (https://outsystemsrd.atlassian.net/browse/RMET-822)
+
+
 #### Version 0.8.5 (22.05.2017)
 - iOS 10
 

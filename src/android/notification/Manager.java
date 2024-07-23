@@ -24,12 +24,14 @@
 package de.appplant.cordova.plugin.notification;
 
 import android.annotation.SuppressLint;
+import android.app.AlarmManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.service.notification.StatusBarNotification;
-import android.support.v4.app.NotificationManagerCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -43,8 +45,10 @@ import de.appplant.cordova.plugin.badge.BadgeImpl;
 import static android.os.Build.VERSION.SDK_INT;
 import static android.os.Build.VERSION_CODES.M;
 import static android.os.Build.VERSION_CODES.O;
-import static android.support.v4.app.NotificationManagerCompat.IMPORTANCE_DEFAULT;
+import static androidx.core.app.NotificationManagerCompat.IMPORTANCE_DEFAULT;
+import static androidx.core.app.NotificationManagerCompat.IMPORTANCE_HIGH;
 import static de.appplant.cordova.plugin.notification.Notification.PREF_KEY_ID;
+import static de.appplant.cordova.plugin.notification.Notification.Type.SCHEDULED;
 import static de.appplant.cordova.plugin.notification.Notification.Type.TRIGGERED;
 
 /**
@@ -90,6 +94,15 @@ public final class Manager {
     }
 
     /**
+     * Checks whether or not the app has permission to schedule exact alarms.
+     * @return true if there's permission to schedule exact alarms. false otherwise.
+     */
+    public boolean canScheduleExactAlarms() {
+        // Should always be true when working with Android 12 (API level 32) or below.
+        return Build.VERSION.SDK_INT <= 32 || getAlarmMgr().canScheduleExactAlarms();
+    }
+
+    /**
      * Schedule local notification specified by request.
      *
      * @param request Set of notification options.
@@ -120,7 +133,7 @@ public final class Manager {
             return;
 
         channel = new NotificationChannel(
-                CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT);
+                CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_HIGH);
 
         mgr.createNotificationChannel(channel);
     }
@@ -220,28 +233,17 @@ public final class Manager {
     }
 
     /**
-     * All local notification IDs for given type.
+     * All local notification ids for given type following the legacy TRIGGERED
      *
      * @param type The notification life cycle type
      */
     public List<Integer> getIdsByType(Notification.Type type) {
+        List<Notification> notifications = getByType(type);
+        List<Integer> ids              = new ArrayList<Integer>();
 
-        if (type == Notification.Type.ALL)
-            return getIds();
-
-        StatusBarNotification[] activeToasts = getActiveNotifications();
-        List<Integer> activeIds              = new ArrayList<Integer>();
-
-        for (StatusBarNotification toast : activeToasts) {
-            activeIds.add(toast.getId());
+        for (Notification toast : notifications) {
+            ids.add(toast.getId());
         }
-
-        if (type == TRIGGERED)
-            return activeIds;
-
-        List<Integer> ids = getIds();
-        ids.removeAll(activeIds);
-
         return ids;
     }
 
@@ -277,13 +279,24 @@ public final class Manager {
      * @param type The notification life cycle type
      */
     private List<Notification> getByType(Notification.Type type) {
-
+        List<Notification> allNotifications = getAll();
         if (type == Notification.Type.ALL)
-            return getAll();
+            return allNotifications;
 
-        List<Integer> ids = getIdsByType(type);
+        List<Notification> scheduled = new ArrayList<Notification>();
 
-        return getByIds(ids);
+        for (Notification toast : allNotifications) {
+            if(toast.isScheduled()){
+                scheduled.add(toast);
+            }
+        }
+
+        if (type == SCHEDULED)
+            return scheduled;
+
+        allNotifications.removeAll(scheduled);
+
+        return allNotifications;
     }
 
     /**
@@ -346,6 +359,19 @@ public final class Manager {
         try {
             String json     = prefs.getString(toastId, null);
             JSONObject dict = new JSONObject(json);
+
+            //compatibility with versiono 0.8
+            if (dict.has("trigger")) {
+                JSONObject trigger = dict.getJSONObject("trigger");
+                //copy trigger.at to at
+                if (trigger.has("at")) {
+                    dict.put("at", trigger.getLong("at") / 1000);
+                }
+                //copy trigger.every to every
+                if (trigger.has("every")) {
+                    dict.put("every", trigger.get("every"));
+                }
+            }
 
             return new Options(context, dict);
         } catch (JSONException e) {
@@ -416,6 +442,12 @@ public final class Manager {
         return NotificationManagerCompat.from(context);
     }
 
+    /**
+     * Alarm manager for the application.
+     */
+    private AlarmManager getAlarmMgr () {
+        return (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+    }
 }
 
 // codebeat:enable[TOO_MANY_FUNCTIONS]

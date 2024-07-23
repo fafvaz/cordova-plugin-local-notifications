@@ -25,6 +25,7 @@ var exec    = require('cordova/exec'),
 // Defaults
 exports._defaults = {
     actions       : [],
+    at            : null,
     attachments   : [],
     autoClear     : true,
     badge         : null,
@@ -33,6 +34,7 @@ exports._defaults = {
     color         : null,
     data          : null,
     defaults      : 0,
+    every         : null,
     foreground    : null,
     group         : null,
     groupSummary  : false,
@@ -55,7 +57,9 @@ exports._defaults = {
     title         : '',
     trigger       : { type : 'calendar' },
     vibrate       : false,
-    wakeup        : true
+    wakeup        : true,
+    isExactNotification: true,
+    isExactMandatory: false
 };
 
 // Event listener
@@ -95,7 +99,7 @@ exports.requestPermission = function (callback, scope) {
  *
  * @return [ Void ]
  */
-exports.schedule = function (msgs, callback, scope, args) {
+exports.schedule = function (msgs, callback, errorCallback, scope, args) {
     var fn = function (granted) {
         var toasts = this._toArray(msgs);
 
@@ -110,7 +114,7 @@ exports.schedule = function (msgs, callback, scope, args) {
             this._convertProperties(toast);
         }
 
-        this._exec('schedule', toasts, callback, scope);
+        this._exec_with_error('schedule', toasts, callback, errorCallback, scope);
     };
 
     if (args && args.skipPermission) {
@@ -359,7 +363,7 @@ exports.get = function () {
  * @return [ Void ]
  */
 exports.getAll = function (callback, scope) {
-    this._exec('notifications', 0, callback, scope);
+    this._exec('notifications', [0], callback, scope);
 };
 
 /**
@@ -369,7 +373,7 @@ exports.getAll = function (callback, scope) {
  * @param [ Object ]     scope    The callback function's scope.
  */
 exports.getScheduled = function (callback, scope) {
-    this._exec('notifications', 1, callback, scope);
+    this._exec('notifications', [1], callback, scope);
 };
 
 /**
@@ -379,7 +383,7 @@ exports.getScheduled = function (callback, scope) {
  * @param [ Object ]     scope    The callback function's scope.
  */
 exports.getTriggered = function (callback, scope) {
-    this._exec('notifications', 2, callback, scope);
+    this._exec('notifications', [2], callback, scope);
 };
 
 /**
@@ -707,8 +711,12 @@ exports._convertTrigger = function (options) {
     var trigger  = options.trigger || {},
         date     = this._getValueFor(trigger, 'at', 'firstAt', 'date');
 
+
     var dateToNum = function (date) {
-        var num = typeof date == 'object' ? date.getTime() : date;
+        var num = typeof date == 'object' ? date.getTime() : (typeof date == 'string' ? Date.parse(date) : date);
+        if(num.length === 10){
+            num *= 1000;
+        }
         return Math.round(num);
     };
 
@@ -722,7 +730,13 @@ exports._convertTrigger = function (options) {
     var isCal = trigger.type == 'calendar';
 
     if (isCal && !date) {
+        var now = new Date(Date.now());
         date = this._getValueFor(options, 'at', 'firstAt', 'date');
+        var dateObj = new Date(date);
+        if(dateObj < now){
+        date = now;
+        date.setSeconds(date.getSeconds() + 5);
+        }
     }
 
     if (isCal && !trigger.every && options.every) {
@@ -906,6 +920,45 @@ exports._exec = function (action, args, callback, scope) {
 };
 
 /**
+ * Execute the native counterpart with error callback
+ *
+ * @param [ String ]  action   The name of the action.
+ * @param [ Array ]   args     Array of arguments.
+ * @param [ Function] callback The callback function.
+ * @param [ Function] errorCallback The error callback function.
+ * @param [ Object ] scope     The scope for the function.
+ *
+ * @return [ Void ]
+ */
+exports._exec_with_error = function (action, args, callback, errorCallback, scope) {
+    var fn     = this._createCallbackFn(callback, scope),
+        params = [];
+
+    var efn = this._createCallbackFn(errorCallback, scope);
+    if (Array.isArray(args)) {
+        params = args;
+    } else if (args) {
+        params.push(args);
+    }
+
+    exec(fn, efn, 'LocalNotification', action, params);
+};
+
+exports._exec_with_error = function (action, args, successCallback, errorCallback, scope) {
+    let sfn = this._createCallbackFn(successCallback, scope);
+    let efn = this._createCallbackFn(errorCallback, scope);
+    params = [];
+
+    if (Array.isArray(args)) {
+        params = args;
+    } else if (args) {
+        params.push(args);
+    }
+
+    exec(sfn, efn, 'LocalNotification', action, params);
+};
+
+/**
  * Set the launch details if the app was launched by clicking on a toast.
  *
  * @return [ Void ]
@@ -1021,12 +1074,13 @@ if (!Array.from) {
   }());
 }
 
-// Called after 'deviceready' event
-channel.deviceready.subscribe(function () {
-    if (!window.skipLocalNotificationReady) {
-        exports.fireQueuedEvents();
-    }
-});
+/**
+ * Inform that webapp is ready, listeners are registered
+ * and all queued event can be executed
+ */
+exports.deviceReady = function() {
+    exports._exec('ready');
+};
 
 // Called before 'deviceready' event
 channel.onCordovaReady.subscribe(function () {

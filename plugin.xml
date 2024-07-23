@@ -24,7 +24,7 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
         id="cordova-plugin-local-notification"
-        version="0.9.0-beta.3">
+        version="0.9.12">
 
     <name>LocalNotification</name>
 
@@ -50,7 +50,7 @@
 
     <!-- dependencies -->
     <dependency id="cordova-plugin-device" />
-    <dependency id="cordova-plugin-badge" version=">=0.8.5" />
+    <dependency id="cordova-plugin-badge" url="https://github.com/OutSystems/cordova-plugin-badge.git#0.8.8-OS" />
 
     <!-- js -->
     <js-module src="www/local-notification.js" name="LocalNotification">
@@ -90,8 +90,6 @@
 
     <!-- android -->
     <platform name="android">
-        <preference name="ANDROID_SUPPORT_V4_VERSION" default="26.+" />
-        <framework src="com.android.support:support-v4:$ANDROID_SUPPORT_V4_VERSION" />
         <framework src="src/android/build/localnotification.gradle" custom="true" type="gradleReference"/>
 
         <config-file target="res/xml/config.xml" parent="/*">
@@ -132,16 +130,35 @@
                     <action android:name="android.intent.action.BOOT_COMPLETED" />
                 </intent-filter>
             </receiver>
+            <activity
+                android:exported="false"
+                android:launchMode="singleTask"
+                android:name="de.appplant.cordova.plugin.localnotification.ClickActivity"
+                android:theme="@android:style/Theme.NoDisplay" />
         </config-file>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
             <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
         </config-file>
 
         <source-file
             src="src/android/xml/localnotification_provider_paths.xml"
             target-dir="res/xml" />
+
+        <source-file
+            src="src/android/OSLCNOError.java"
+            target-dir="src/de/appplant/cordova/plugin/localnotification" />
+
+        <source-file
+            src="src/android/OSLCNOWarning.java"
+            target-dir="src/de/appplant/cordova/plugin/localnotification" />
+
+        <source-file
+            src="src/android/OSLCNOPluginMessage.java"
+            target-dir="src/de/appplant/cordova/plugin/localnotification" />
 
         <source-file
             src="src/android/LocalNotification.java"
@@ -154,6 +171,10 @@
         <source-file
             src="src/android/ClickReceiver.java"
             target-dir="src/de/appplant/cordova/plugin/localnotification" />
+
+        <source-file
+            src="src/android/ClickActivity.java"
+            target-dir="src/de/appplant/cordova/plugin/localnotification" />    
 
         <source-file
             src="src/android/ClearReceiver.java"
@@ -177,6 +198,10 @@
 
         <source-file
             src="src/android/notification/receiver/AbstractClickReceiver.java"
+            target-dir="src/de/appplant/cordova/plugin/notification/receiver" />
+
+        <source-file
+            src="src/android/notification/receiver/AbstractClickActivity.java"
             target-dir="src/de/appplant/cordova/plugin/notification/receiver" />
 
         <source-file
