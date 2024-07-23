@@ -24,7 +24,6 @@
 package de.appplant.cordova.plugin.localnotification;
 
 import android.content.Context;
-import android.util.Log;
 
 import java.util.Date;
 
