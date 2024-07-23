@@ -386,7 +386,7 @@ public final class Notification {
      */
     public void show() {
         // Don't show notification if the application is in foreground
-        if(applicationState == null || applicationState.equalsIgnoreCase("foreground")) return;
+        //if(applicationState == null || applicationState.equalsIgnoreCase("foreground")) return;
 
         if (builder == null) return;
 
